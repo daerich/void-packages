@@ -1,0 +1,50 @@
+pkgname=openjdk17-bin
+version=17.0.2
+revision=1
+archs="x86_64"
+short_desc="Official Reference Implementation for Java SE 17"
+maintainer="daerich <daerich@sourceforge.net>"
+license="GPL-2.0-or-later"
+homepage="https://jdk.java.net/17"
+create_wrksrc=yes
+wrksrc=openjdk17-bin
+distfiles="https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_linux-x64_bin.tar.gz"
+checksum=0022753d0cceecacdd3a795dd4cea2bd7ffdf9dc06e22ffd1be98411742fbb44
+nopie=true
+
+alternatives="
+ java:/usr/bin/java:/usr/lib/jvm/openjdk17-bin/bin/java
+ java:/usr/bin/jpackage:/usr/lib/jvm/openjdk17-bin/bin/jpackage
+ java:/usr/bin/keytool:/usr/lib/jvm/openjdk17-bin/bin/keytool
+ java:/usr/bin/rmiregistry:/usr/lib/jvm/openjdk17-bin/bin/rmiregistry
+ jdk:/usr/bin/jar:/usr/lib/jvm/openjdk17-bin/bin/jar
+ jdk:/usr/bin/jarsigner:/usr/lib/jvm/openjdk17-bin/bin/jarsigner
+ jdk:/usr/bin/javac:/usr/lib/jvm/openjdk17-bin/bin/javac
+ jdk:/usr/bin/javadoc:/usr/lib/jvm/openjdk17-bin/bin/javadoc
+ jdk:/usr/bin/javap:/usr/lib/jvm/openjdk17-bin/bin/javap
+ jdk:/usr/bin/jcmd:/usr/lib/jvm/openjdk17-bin/bin/jcmd
+ jdk:/usr/bin/jconsole:/usr/lib/jvm/openjdk17-bin/bin/jconsole
+ jdk:/usr/bin/jdb:/usr/lib/jvm/openjdk17-bin/bin/jdb
+ jdk:/usr/bin/jdeprscan:/usr/lib/jvm/openjdk17-bin/bin/jdeprscan
+ jdk:/usr/bin/jdeps:/usr/lib/jvm/openjdk17-bin/bin/jdeps
+ jdk:/usr/bin/jfr:/usr/lib/jvm/openjdk17-bin/bin/jfr
+ jdk:/usr/bin/jhsdb:/usr/lib/jvm/openjdk17-bin/bin/jhsdb
+ jdk:/usr/bin/jimage:/usr/lib/jvm/openjdk17-bin/bin/jimage
+ jdk:/usr/bin/jinfo:/usr/lib/jvm/openjdk17-bin/bin/jinfo
+ jdk:/usr/bin/jlink:/usr/lib/jvm/openjdk17-bin/bin/jlink
+ jdk:/usr/bin/jmap:/usr/lib/jvm/openjdk17-bin/bin/jmap
+ jdk:/usr/bin/jmod:/usr/lib/jvm/openjdk17-bin/bin/jmod
+ jdk:/usr/bin/jps:/usr/lib/jvm/openjdk17-bin/bin/jps
+ jdk:/usr/bin/jrunscript:/usr/lib/jvm/openjdk17-bin/bin/jrunscript
+ jdk:/usr/bin/jshell:/usr/lib/jvm/openjdk17-bin/bin/jshell
+ jdk:/usr/bin/jstack:/usr/lib/jvm/openjdk17-bin/bin/jstack
+ jdk:/usr/bin/jstat:/usr/lib/jvm/openjdk17-bin/bin/jstat
+ jdk:/usr/bin/jstatd:/usr/lib/jvm/openjdk17-bin/bin/jstatd
+ jdk:/usr/bin/serialver:/usr/lib/jvm/openjdk17-bin/bin/serialver
+"
+
+do_install() {
+	vmkdir /usr/lib/jvm/openjdk17-bin
+	vinstall ${FILESDIR}/10_openjdk17.sh 644 etc/profile.d
+	cp -R ./jdk-${version}/* ${DESTDIR}/usr/lib/jvm/openjdk17-bin
+}
