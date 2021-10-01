@@ -1,0 +1,40 @@
+From bbfce7395fc518ee923f1bb6582e1a19e56ac616 Mon Sep 17 00:00:00 2001
+From: DaErich <fakefakefans@gmail.com>
+Date: Fri, 1 Oct 2021 17:11:00 +0200
+Subject: [PATCH 2/2] Remove unnecessary BatteryPowerScript as it's no longer
+ needed
+
+---
+ contrib/0anacron | 18 ++----------------
+ 1 file changed, 2 insertions(+), 16 deletions(-)
+
+diff --git a/contrib/0anacron b/contrib/0anacron
+index c2b0302..bc72ad0 100644
+--- a/contrib/0anacron
++++ b/contrib/0anacron
+@@ -6,20 +6,6 @@ fi
+ if [ `date +%Y%m%d` = "$day" ]; then
+     exit 0
+ fi
+-
+-# Do not run jobs when on battery power
+-online=1
+-for psupply in /sys/class/power_supply/* ; do
+-    if [ `cat "$psupply/type" 2>/dev/null`x = Mainsx ] && [ -f "$psupply/online" ]; then
+-        if [ `cat "$psupply/online" 2>/dev/null`x = 1x ]; then
+-            online=1
+-            break
+-        else
+-            online=0
+-        fi
+-    fi
+-done
+-if [ $online = 0 ]; then
+-    exit 0
+-fi
++# Battery power check has been included in anacron binary
++# see anacron -p 
+ /usr/sbin/anacron -s
+-- 
+2.33.0
+

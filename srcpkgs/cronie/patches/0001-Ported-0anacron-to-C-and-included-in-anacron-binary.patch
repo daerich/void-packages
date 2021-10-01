@@ -1,0 +1,186 @@
+From 5e240907e89a23c55a7681ff16cec9abaa335019 Mon Sep 17 00:00:00 2001
+From: DaErich <fakefakefans@gmail.com>
+Date: Thu, 30 Sep 2021 00:37:22 +0200
+Subject: [PATCH 1/2] Ported 0anacron to C and included in anacron binary
+
+---
+ anacron/main.c | 115 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 113 insertions(+), 2 deletions(-)
+
+diff --git a/anacron/main.c b/anacron/main.c
+index 65f8fed..bee7e91 100644
+--- a/anacron/main.c
++++ b/anacron/main.c
+@@ -28,11 +28,13 @@
+ #include <sys/time.h>
+ #include <stdio.h>
+ #include <unistd.h>
++#include <dirent.h>
+ #include <signal.h>
+ #include <fcntl.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <string.h>
++#include <stdarg.h>
+ #include <stdlib.h>
+ #include <locale.h>
+ #include "global.h"
+@@ -47,7 +49,7 @@ char *program_name;
+ char *anacrontab = NULL;
+ char *spooldir = NULL;
+ int serialize, force, update_only, now,
+-    no_daemon, quiet, testing_only;            /* command-line options */
++    no_daemon, quiet, testing_only, power_override;            /* command-line options */
+ char **job_args;                       	       /* vector of "job" command-line arguments */
+ int job_nargs;                                 /* number of these */
+ char *defarg = "*";
+@@ -86,6 +88,7 @@ print_usage(void)
+     printf(" -s         Serialize execution of jobs\n");
+     printf(" -f         Force execution of jobs, even before their time\n");
+     printf(" -n         Run jobs with no delay, implies -s\n");
++    printf(" -p <integer> Force execution even when on battery power\n");
+     printf(" -d         Don't fork to the background\n");
+     printf(" -q         Suppress stderr messages, only applicable with -d\n");
+     printf(" -u         Update the timestamps without actually running anything\n");
+@@ -97,6 +100,102 @@ print_usage(void)
+     printf("\nSee the anacron(8) manpage for more details.\n");
+ }
+ 
++static char * 
++vstrcat(int c, ...)
++{
++	va_list ap;
++	char * res = NULL;
++	size_t length = 0;
++	va_start(ap, c);
++	for(int idx = 0;idx < c; idx++){
++		length += strlen(va_arg(ap, char *));
++	}
++	va_end(ap);
++	res = malloc(sizeof(char)*(length + 1));
++	va_start(ap,c);
++	for(int idx = 0;idx < c; idx++){
++		if(idx == 0)
++			strcpy(res, va_arg(ap, char *));
++		else
++			strcat(res, va_arg(ap, char *));
++	}
++	va_end(ap);
++	return res;
++}
++
++static void 
++read_file(char * readbuf, const char * filename, const char * fileext, int readbytes)
++{       
++        FILE *file;
++        char *filenamep;
++	filenamep = vstrcat(3, "/sys/class/power_supply/", filename, fileext);
++        if((file = fopen(filenamep, "r")) == NULL)
++            die_e("Coul'nt open file: %s!Exit!", filenamep);
++        fgets(readbuf,readbytes + 1,file);
++        free(filenamep);
++        fclose(file);
++
++}
++
++static int powerLeft(void)
++{
++	int cap = 0;
++	DIR *dirp;
++	struct dirent *dirent;
++	char readres[10];
++	if((dirp = opendir("/sys/class/power_supply/")) == NULL){
++        explain("Could'nt open power directory; -p is not considered");
++        return 0;
++	}
++	while((dirent = readdir(dirp)) != NULL){
++        if(strcmp(dirent->d_name, ".") == 0 || strcmp(dirent->d_name, "..") == 0)
++            continue;
++        read_file(readres,dirent->d_name, "/type", 8);
++        if(strstr(readres, "Battery")){
++			char readres[3];
++			int res;
++            read_file(readres, dirent->d_name, "/capacity", 3);
++			if((res = atoi(readres)) > cap)
++				cap = res;
++        }       
++    }
++    /* Fallback - dir is empty */
++    closedir(dirp);
++    return cap;
++
++}
++
++static int 
++isPowered(void)
++{
++    DIR *dirp;
++    struct dirent *dirent;
++    char readres[10];
++    if((dirp = opendir("/sys/class/power_supply/")) == NULL){
++        explain("Could'nt open power directory; -p is not considered");
++        return 1;
++    }
++    while((dirent = readdir(dirp)) != NULL){
++        if(strcmp(dirent->d_name, ".") == 0 || strcmp(dirent->d_name, "..") == 0)
++            continue;
++        read_file(readres,dirent->d_name, "/type", 8);
++        if(strstr(readres, "Main")){
++            char readres[1];
++            read_file(readres, dirent->d_name, "/online", 1);
++            if (atoi(readres) == 1){
++                closedir(dirp);
++                return 1;
++            }else{
++                closedir(dirp);
++                return 0;
++            }
++        }       
++    }
++    /* Fallback - dir is empty */
++    closedir(dirp);
++    return 1;
++}
++
+ static void
+ parse_opts(int argc, char *argv[])
+ /* Parse command-line options */
+@@ -104,8 +203,9 @@ parse_opts(int argc, char *argv[])
+     int opt;
+ 
+     quiet = no_daemon = serialize = force = update_only = now = 0;
++    power_override = -1;
+     opterr = 0;
+-    while ((opt = getopt(argc, argv, "sfundqt:TS:Vh")) != EOF)
++    while ((opt = getopt(argc, argv, "sfundqp:t:TS:Vh")) != EOF)
+     {
+ 	switch (opt)
+ 	{
+@@ -127,6 +227,9 @@ parse_opts(int argc, char *argv[])
+ 	case 'q':
+ 	    quiet = 1;
+ 	    break;
++	case 'p':
++	    power_override = atoi(optarg);
++	    break;
+ 	case 't':
+ 	    free(anacrontab);
+ 	    anacrontab = strdup(optarg);
+@@ -459,6 +562,14 @@ main(int argc, char *argv[])
+ 	++program_name; /* move pointer to char after '/' */
+ 
+     parse_opts(argc, argv);
++    /* Replacement of BatterPower-Script */
++    if(!isPowered())
++        if(power_override == -1)
++            die_e("No override level specified, exiting!");
++        else if(power_override < 20)
++                die_e("Invalid power level was %d needed at least 20", power_override);
++            else if(power_override > powerLeft())
++                die_e("Not enough power left!Exiting");
+ 
+     if (anacrontab == NULL)
+ 	anacrontab = strdup(ANACRONTAB);
+-- 
+2.33.0
+
