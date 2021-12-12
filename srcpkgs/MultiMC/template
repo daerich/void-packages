@@ -1,50 +1,54 @@
 # Template file for 'MultiMC'
 pkgname=MultiMC
-version=0.6.13
+version=0.6.14
 revision=1
-wrksrc="Launcher-${version}"
-_commithashnbt="4b305bbd2ac0e7a26987baf7949a484a87b474d4"
-_nbtversion="multimc-0.6.1"
-_quazipversion="multimc-3"
-build_style=cmake
-configure_args='-DMultiMC_BUILD_PLATFORM=Void -DMultiMC_LAYOUT=lin-system'
-hostmakedepends="openjdk8 xxd git qt5-qmake qt5-host-tools tar"
-makedepends="qt5-devel qt5-x11extras-devel qt5-svg-devel gtk+-devel"
+archs="x86_64 i686"
+wrksrc="MultiMC"
+create_wrksrc=yes
 depends="virtual?java-environment qt5-svg"
 short_desc="Instanced Minecraft client"
 maintainer="Orphaned <orphan@voidlinux.org>"
 license="Apache-2.0"
 homepage="http://multimc.org"
-distfiles="https://github.com/MultiMC/Launcher/archive/${version}.tar.gz
- https://github.com/${pkgname}/libnbtplusplus/archive/${_nbtversion}.tar.gz
- https://github.com/${pkgname}/quazip/archive/${_quazipversion}.tar.gz"
-checksum="d77d07e77754875a8a4abd5a2f4d0e01593aa7ffb4860efe993eb2755e8a3164
- 36c816e6b1ef8ece52c57dfa9bfda3a23808d0c6c3288b25d8bcf49c7cdb5b07
- ffa60368b1c196859691b637c740f4c60597b2ac47217995082ae8b2a3a9ac18"
-skip_extraction="${_nbtversion}.tar.gz ${_quazipversion}.tar.gz"
+
+case "$XBPS_TARGET_MACHINE" in
+	i686)_arch="32"
+	checksum="5ea54392e35e97f7123ddf669ebd02271474a758a75f4fecc0acd4f6eb240829 ";;
+	x86_64)_arch="64"
+	checksum="b99051b70903c7229877c9c2bc2ccaf1c20bb2510a5e4082d0113331bd321023 ";;
+	*)broken="aarch* and arm* binaries are not shipped by upstream!";;
+esac
+_debver=1.6-1
+
+distfiles="https://files.multimc.org/downloads/mmc-stable-lin${_arch}.tar.gz
+https://files.multimc.org/downloads/multimc_${_debver}.deb"
+checksum+=d30b2577463178fd3cbe0dd30e68a30be3f85d8f50f8052e844a43acf4b46e0f
+nopie=yes
+nodebug=yes
 
 # Restricted since we don't have permissions to ship builds with the
 # MultiMC name, artwork or the API endpoints.
 restricted=yes
 
-case "$XBPS_TARGET_MACHINE" in
-	armv*) broken="https://github.com/MultiMC/MultiMC5/issues/2895";;
-esac
-
-pre_configure() {
-	export JAVA_HOME=/usr/lib/jvm/java-1.8-openjdk
-	export PATH=$PATH:$JAVA_HOME/bin
-	tar zxvf "${XBPS_SRCDISTDIR}/${pkgname}-${version}/${_nbtversion}.tar.gz" -C "${wrksrc}/libraries/libnbtplusplus" --strip-components 1
-	tar zxvf "${XBPS_SRCDISTDIR}/${pkgname}-${version}/${_quazipversion}.tar.gz" -C "${wrksrc}/libraries/quazip" --strip-components 1
+do_extract() {
+	bsdtar -xf ${XBPS_SRCDISTDIR}/${pkgname}-${version}/multimc_${_debver}.deb
+	bsdtar -xf data.tar.xz
+	bsdtar -xf ${XBPS_SRCDISTDIR}/${pkgname}-${version}/mmc-stable-lin${_arch}.tar.gz
 }
 
-post_install() {
+do_install() {
 	vmkdir usr/libexec/multimc
-	mv "${DESTDIR}/usr/bin/multimc" "${DESTDIR}/usr/libexec/multimc"
-	vbin "${FILESDIR}/MultiMC.sh" MultiMC
-	vinstall build/libMultiMC_nbt++.so 755 /usr/lib
-	vinstall build/libMultiMC_quazip.so 755 /usr/lib
-	vinstall launcher/package/linux/multimc.desktop 644 /usr/share/applications
-	vsed -i "${DESTDIR}/usr/share/applications/multimc.desktop" -e 's/Exec=multimc/Exec=MultiMC/'
-	vinstall launcher/resources/multimc/scalable/multimc.svg 644 /usr/share/pixmaps
+	vmkdir usr/bin
+	vmkdir usr/share/applications
+	vmkdir usr/share/pixmaps
+	vbin ${FILESDIR}/MultiMC.sh MultiMC
+	cp -R ./MultiMC/bin/* ${DESTDIR}/usr/libexec/multimc
+	chmod 755 ${DESTDIR}/usr/libexec/multimc/*.so
+	mv ${DESTDIR}/usr/libexec/multimc/MultiMC ${DESTDIR}/usr/libexec/multimc/multimc
+	mv opt/multimc/icon.svg ${DESTDIR}/usr/share/pixmaps/multimc.svg
+	mv usr/share/applications/multimc.desktop ${DESTDIR}/usr/share/applications/
+	chmod 644 ${DESTDIR}/usr/share/applications/multimc.desktop
+	vsed -i ${DESTDIR}/usr/share/applications/multimc.desktop -e 's%Exec=/opt/multimc/run.sh%Exec=MultiMC%'
+	vsed -i ${DESTDIR}/usr/share/applications/multimc.desktop -e 's%Icon=/opt/multimc/icon.svg%Icon=multimc%'
+	chmod 644 ${DESTDIR}/usr/share/pixmaps/multimc.svg
 }
